@@ -1,0 +1,75 @@
+package com.ralise.hiring.workforcement.repository;
+
+import com.ralise.hiring.workforcement.common.model.enums.ReferenceType;
+import com.ralise.hiring.workforcement.model.TaskManagement;
+import com.ralise.hiring.workforcement.model.enums.*;
+import org.springframework.stereotype.Repository;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+
+@Repository
+public class InMemoryTaskRepository implements TaskRepository {
+    private final Map<Long, TaskManagement> taskStore = new ConcurrentHashMap<>();
+    private final AtomicLong idCounter = new AtomicLong(0);
+
+    public InMemoryTaskRepository() {
+        // Seed data
+        createSeedTask(10L, ReferenceType.ORDER, Task.CREATE_INVOICE, 1L, TaskStatus.ASSIGNED, Priority.HIGH);
+        createSeedTask(10L, ReferenceType.ORDER, Task.ARRANGE_PICKUP, 1L, TaskStatus.COMPLETED, Priority.HIGH);
+        createSeedTask(10L, ReferenceType.ORDER, Task.CREATE_INVOICE, 2L, TaskStatus.ASSIGNED, Priority.MEDIUM);
+        createSeedTask(20L, ReferenceType.ENTITY, Task.ASSIGN_CUSTOMER_TO_SALES_PERSON, 2L, TaskStatus.ASSIGNED, Priority.LOW);
+        createSeedTask(20L, ReferenceType.ENTITY, Task.ASSIGN_CUSTOMER_TO_SALES_PERSON, 3L, TaskStatus.ASSIGNED, Priority.LOW);
+        createSeedTask(10L, ReferenceType.ORDER, Task.COLLECT_PAYMENT, 1L, TaskStatus.CANCELLED, Priority.MEDIUM);
+    }
+
+    private void createSeedTask(Long refId, ReferenceType refType, Task task, Long assignedId, TaskStatus status, Priority priority) {
+        long newId = idCounter.incrementAndGet();
+        TaskManagement newTask = new TaskManagement();
+        newTask.setId(newId);
+        newTask.setReferenceId(refId);
+        newTask.setReferenceType(refType);
+        newTask.setTask(task);
+        newTask.setAssignedId(assignedId);
+        newTask.setStatus(status);
+        newTask.setPriority(priority);
+        newTask.setDescription("This is a seed task.");
+        newTask.setTaskDeadlineTime(System.currentTimeMillis() + 86400000);
+        taskStore.put(newId, newTask);
+    }
+
+    @Override
+    public Optional<TaskManagement> findById(Long id) {
+        return Optional.ofNullable(taskStore.get(id));
+    }
+
+    @Override
+    public TaskManagement save(TaskManagement task) {
+        if (task.getId() == null) {
+            task.setId(idCounter.incrementAndGet());
+        }
+        taskStore.put(task.getId(), task);
+        return task;
+    }
+
+    @Override
+    public List<TaskManagement> findAll() {
+        return List.copyOf(taskStore.values());
+    }
+
+    @Override
+    public List<TaskManagement> findByReferenceIdAndReferenceType(Long referenceId, ReferenceType referenceType) {
+        return taskStore.values().stream()
+                .filter(task -> task.getReferenceId().equals(referenceId) && task.getReferenceType().equals(referenceType))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<TaskManagement> findByAssignedIdIn(List<Long> assigneeIds) {
+        return taskStore.values().stream()
+                .filter(task -> assigneeIds.contains(task.getAssignedId()))
+                .collect(Collectors.toList());
+    }
+}
